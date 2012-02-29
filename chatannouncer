@@ -1,0 +1,92 @@
+#!/usr/bin/env python
+
+
+import sys
+import logging
+import ConfigParser as configparser
+import sleekxmpp
+
+
+class AttriDict(dict):
+    """Like a dictionary, but also like an object."""
+
+    def __getattr__(self, key):
+        """Allow keys to be accessed like attributes."""
+        return self[key]
+
+
+class OptionParser:
+    """Build a structure."""
+
+    def __init__(self):
+        """Create a new OptionParser."""
+        self.top_level_sections = []
+
+    def add_top_level_section(self, section):
+        """Declare that a given section's options are top-level."""
+        self.top_level_sections.append(section)
+
+    def build(self, filename):
+        """Build an options struction from the given file."""
+        parser = configparser.ConfigParser()
+        parser.read(filename)
+        options = AttriDict()
+        for section in parser.sections():
+            if section in self.top_level_sections:
+                for option in parser.options(section):
+                    options[option] = parser.get(section, option)
+            else:
+                options[section] = AttriDict()
+                for option in parser.options(section):
+                    options[section][option] = parser.get(section, option)
+        return options
+
+
+class ChatMaker(sleekxmpp.ClientXMPP):
+    """Enters a chat room and acts upon messages said."""
+
+    def __init__(self, options, message):
+        """Create a new ChatWatcher, logging on with given details."""
+        self.options = options
+        self.message = message
+        sleekxmpp.ClientXMPP.__init__(self,
+            options.account.jid, options.account.password)
+        self.add_event_handler("session_start", self.start)
+        self.register_plugin('xep_0030') # Service Discovery
+        self.register_plugin('xep_0045') # Multi-User Chat
+        self.register_plugin('xep_0199') # XMPP Ping
+
+    def start(self, event):
+        """Event handler for an initial successful connection."""
+        self.get_roster()
+        self.send_presence()
+        self.plugin['xep_0045'].joinMUC(
+            self.options.room.id,
+            self.options.room.alias,
+            password=self.options.room.password,
+            wait=True
+        )
+        self.send_message(
+            mtype="groupchat",
+            mbody=self.message,
+            mto=self.options.room.id
+        )
+        self.disconnect(wait=True)
+
+
+def main():
+    logging.basicConfig(level=logging.DEBUG)
+    if len(sys.argv) < 2:
+        sys.exit(1)
+    parser = OptionParser()
+    options = parser.build("options.cfg")
+    c = ChatMaker(options, sys.argv[1])
+    connected = c.connect()
+    assert connected
+    c.process(block=True)
+
+
+if __name__ == '__main__':
+    main()
+
+
