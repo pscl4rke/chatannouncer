@@ -2,9 +2,15 @@
 
 
 import sys
+import os
 import logging
 import ConfigParser as configparser
 import sleekxmpp
+
+
+OPTION_LOCATIONS = [
+    "$HOME/.chatannouncer.cfg",
+]
 
 
 class AttriDict(dict):
@@ -74,13 +80,27 @@ class ChatMaker(sleekxmpp.ClientXMPP):
         self.disconnect(wait=True)
 
 
+def get_message():
+    if len(sys.argv) == 1:
+        return sys.stdin.read()
+    else:
+        return " ".join(sys.argv[1:])
+
+
+def get_options():
+    for location in OPTION_LOCATIONS:
+        path = os.path.expandvars(location)
+        if os.path.exists(path):
+            parser = OptionParser()
+            options = parser.build("options.cfg")
+            return options
+    raise Exception("No config file!")
+
+
 def main():
     logging.basicConfig(level=logging.DEBUG)
-    if len(sys.argv) < 2:
-        sys.exit(1)
-    parser = OptionParser()
-    options = parser.build("options.cfg")
-    c = ChatMaker(options, sys.argv[1])
+    c = ChatMaker(get_options(), get_message())
+    c = ChatMaker(options, get_message())
     connected = c.connect()
     assert connected
     c.process(block=True)
