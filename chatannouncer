@@ -92,7 +92,7 @@ def get_options():
         path = os.path.expandvars(location)
         if os.path.exists(path):
             parser = OptionParser()
-            options = parser.build("options.cfg")
+            options = parser.build(path)
             return options
     raise Exception("No config file!")
 
