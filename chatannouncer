@@ -100,7 +100,6 @@ def get_options():
 def main():
     logging.basicConfig(level=logging.DEBUG)
     c = ChatMaker(get_options(), get_message())
-    c = ChatMaker(options, get_message())
     connected = c.connect()
     assert connected
     c.process(block=True)
